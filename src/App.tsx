@@ -3,7 +3,7 @@ import 'bootstrap/dist/css/bootstrap.css';
 
 import { Navbar, Container, Accordion, Button } from 'react-bootstrap'
 
-import { ethers } from "ethers";
+import { ethers, BigNumber } from "ethers";
 import { useState } from 'react';
 
 declare global {
@@ -16,18 +16,21 @@ function App() {
   const provider = new ethers.providers.Web3Provider(window.ethereum);
 
   const [ selectedAccount, setSelectedAccount ] = useState();
+  const [ accountBalance, setAccountBalance ] = useState("");
 
   const connectToMetaMask = async () => {
     console.log("Connecting to MetaMask");
-    const account = await provider.send("eth_requestAccounts", []);
-    setSelectedAccount(account);
+    const accounts = await provider.send("eth_requestAccounts", []);
+    setSelectedAccount(accounts[0]);
+    const ethBalance = await provider.getBalance(accounts[0]);
+    setAccountBalance(ethers.utils.formatEther(ethBalance));
   }
 
   function UserInfo() {
     if (selectedAccount === undefined) {
       return <Button onClick={connectToMetaMask}>Connect to MetaMask</Button>
     } else {
-      return <Container>{selectedAccount}</Container>
+      return <Container>{`${selectedAccount} (balance: ${accountBalance})`}</Container>
     }
   }
 
@@ -45,8 +48,10 @@ function App() {
       </Navbar>
       <Accordion>
         <Accordion.Item eventKey="0">
-          <Accordion.Header>List pairs</Accordion.Header>
-          <Accordion.Body>Lorem ipsum</Accordion.Body>
+          <Accordion.Header>Token balances</Accordion.Header>
+          <Accordion.Body>
+            
+          </Accordion.Body>
         </Accordion.Item>
         <Accordion.Item eventKey="1">
           <Accordion.Header>Add liquidity</Accordion.Header>
