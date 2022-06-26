@@ -10,4 +10,4 @@ FROM mcr.microsoft.com/vscode/devcontainers/typescript-node:0-${VARIANT}
 # ARG EXTRA_NODE_VERSION=10
 # RUN su node -c "source /usr/local/share/nvm/nvm.sh && nvm install ${EXTRA_NODE_VERSION}"
 
-RUN su node -c "npm install -g create-react-app npm-check-updates"
+RUN su node -c "npm install -g create-react-app npm-check-updates hardhat-shorthand"
