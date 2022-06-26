@@ -25,7 +25,8 @@
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [
-		3000
+		3000,
+		8545 // hardhad local ethereum network
 	],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
