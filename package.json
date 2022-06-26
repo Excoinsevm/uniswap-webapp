@@ -20,6 +20,7 @@
     "web-vitals": "^2.1.4"
   },
   "devDependencies": {
+    "@lobanov/uniswap-v2-core": "^2.0.1",
     "@lobanov/uniswap-v2-periphery": "^2.0.0",
     "@nomiclabs/hardhat-ethers": "^2.0.6",
     "hardhat": "^2.9.9"
