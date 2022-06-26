@@ -1,9 +1,6 @@
 // This script initializes empty local Harthat network with relevant contracts
 
-// import { ContractFactory } from 'ethers';
-// import { ethers } from "hardhat";
-
-const { ContractFactory } = require('ethers');
+const { ContractFactory, BigNumber, utils, constants } = require('ethers');
 
 const weth9Artifact = require('@lobanov/uniswap-v2-periphery/build/WETH9.json');
 const uniswapV2FactoryArtifact = require('@lobanov/uniswap-v2-core/build/UniswapV2Factory.json');
@@ -32,6 +29,18 @@ async function main() {
   await uniswapV2RouterContract.deployed();
 
   console.log("UniswapV2Router deployed to: ", uniswapV2RouterContract.address);
+
+  const testTokenFactory = await hre.ethers.getContractFactory("TestERC20");
+  const testTokenContract = await testTokenFactory.deploy(BigNumber.from(1000).mul(constants.WeiPerEther));
+
+  await testTokenContract.deployed();
+
+  console.log("TestERC20 deployed to: ", testTokenContract.address);
+
+  const symbol = await testTokenContract.symbol();
+  const balanceRaw = await testTokenContract.balanceOf(deployingSigner.address);
+  const balance = utils.formatUnits(BigNumber.from(balanceRaw), 18);
+  console.log(`Address ${deployingSigner.address} has the balance of ${balance} ${symbol}`);
 }
   
 main()

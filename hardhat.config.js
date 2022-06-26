@@ -10,5 +10,5 @@ module.exports = {
       url: "http://localhost:8545"
     }
   },
-  solidity: "0.7.3"
+  solidity: "0.8.0"
 };
