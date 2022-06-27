@@ -3,9 +3,9 @@ import 'bootstrap/dist/css/bootstrap.css';
 
 import Immutable from 'immutable';
 
-import { Navbar, Container, Accordion, Button, Form } from 'react-bootstrap'
+import { Navbar, Container, Accordion, Button, Form, Table } from 'react-bootstrap'
 
-import { ethers, BigNumber } from "ethers";
+import { ethers, BigNumber, constants } from "ethers";
 import React, { useState } from 'react';
 
 import erc20 from '@lobanov/uniswap-v2-periphery/build/ERC20.json';
@@ -36,6 +36,17 @@ interface IWalletAsset {
   balance: BigNumber
 }
 
+interface ILiquidityPair {
+  name: string,
+  token0Symbol: string,
+  token1Symbol: string,
+  token0Decimals: number,
+  token1Decimals: number,
+  token0Reserve: BigNumber,
+  token1Reserve: BigNumber,
+  liquidityTokenOwned: BigNumber
+}
+
 interface IAddTokenFormState {
   contractAddress: string
 }
@@ -61,6 +72,7 @@ function App() {
   const [ accountBalance, setAccountBalance ] = useState("");
 
   const [ walletAssets, setWalletAssets ] = useState(Immutable.Map<string, IWalletAsset>());
+  const [ liquidityPairs, setLiquidityPairs ] = useState(Immutable.Map<string, ILiquidityPair>());
 
   const [ tokenAddressFormState, setTokenAddressFormState ] = useState<IAddTokenFormState>({ contractAddress: "" });
   const [ liquidityFormState, setLiquidityFormState ] = useState<ILiquidityFormState>({} as ILiquidityFormState);
@@ -83,13 +95,16 @@ function App() {
         .map((index) => 
           uniswapFactoryContract.allPairs(index) as Promise<string>
         )
-      );
+    );
+
+    const knownPairContracts = knownPairAddresses.map((pairAddress) =>
+      new ethers.Contract(pairAddress, uniswapV2Pair.abi, provider));
+
     const knownTokenContractsAddresses = await Promise.all(
-      knownPairAddresses.flatMap((pairAddress) => {
-          const pairContract = new ethers.Contract(pairAddress, uniswapV2Pair.abi, provider);
-          return [ pairContract.token0() as Promise<string>, pairContract.token1() as Promise<string> ];
-        })
-      );
+      knownPairContracts.flatMap((pairContract) =>
+        [ pairContract.token0() as Promise<string>, pairContract.token1() as Promise<string> ]
+      )
+    );
     console.log('Token contract addresses known to Uniswap:', knownTokenContractsAddresses);
 
     // deduplicate
@@ -98,7 +113,10 @@ function App() {
       new ethers.Contract(address, erc20.abi, provider));
 
     const assets = await Promise.all(allTokenContracts.map(async (contract) => describeWalletAsset(contract, myAccount)));
-    assets.forEach(addWalletAsset);
+    const assetsMap = Immutable.Map(assets.map((asset) => [ asset.address, asset ]));
+
+    const pairs = await Promise.all(knownPairContracts.map(async (contract) => describeLiquidityPair(contract, myAccount, assetsMap)));
+    pairs.forEach(putLiquidityPair);
 
     // make operation tabs visible
     setConnected(true);
@@ -106,8 +124,8 @@ function App() {
 
   function addWalletAsset(asset: IWalletAsset) {
     setWalletAssets((prev) => {
-      if (!prev.has(asset.symbol)) {
-        return prev.set(asset.symbol, asset);
+      if (!prev.has(asset.address)) {
+        return prev.set(asset.address, asset);
       }
       return prev;
     });
@@ -121,6 +139,34 @@ function App() {
       decimals: results[1] as number,
       balance: BigNumber.from(results[2])
     } as IWalletAsset;
+  }
+
+  function putLiquidityPair(pair: ILiquidityPair) {
+    setLiquidityPairs((prev) => prev.set(pair.name, pair));
+  }
+
+  async function describeLiquidityPair(contract: ethers.Contract, walletAddress: string, assets: Immutable.Map<string, IWalletAsset>): Promise<ILiquidityPair> {
+    const results = await Promise.all([
+      contract.token0(),
+      contract.token1(),
+      contract.getReserves(),
+      contract.balanceOf(walletAddress)
+    ]);
+    const token0Address = results[0] as string;
+    const token1Address = results[1] as string;
+    const token0Symbol = assets.get(token0Address)?.symbol
+    const token1Symbol = assets.get(token1Address)?.symbol
+    const reserves = results[2] as Array<any>;
+    return {
+      name: `${token0Symbol}-${token1Symbol}`,
+      token0Symbol,
+      token1Symbol,
+      token0Decimals: assets.get(token0Address)?.decimals,
+      token1Decimals: assets.get(token1Address)?.decimals,
+      token0Reserve: reserves[0] as BigNumber,
+      token1Reserve: reserves[1] as BigNumber,
+      liquidityTokenOwned: results[3] as BigNumber
+    } as ILiquidityPair;
   }
 
   function UserInfo() {
@@ -205,9 +251,28 @@ function App() {
     <Accordion.Item eventKey="1">
       <Accordion.Header>Liquidity</Accordion.Header>
       <Accordion.Body>
-        <p>This app only supports adding liquidity for trading tokens for ether.</p>
-        <p>Select a token to see its liquidity pool status.</p>
-        <Form>
+        <p>Liquidity pool status</p>
+        <Table>
+          <thead>
+            <th>Pair</th>
+            <th>Token 0 reserve</th>
+            <th>Token 1 reserve</th>
+            <th>Liquidity tokens owned</th>
+          </thead>
+          <tbody>
+            {
+              liquidityPairs.valueSeq().map((pair) => 
+                <tr key={pair.name}>
+                  <td>{ pair.name }</td>
+                  <td>{ ethers.utils.formatUnits(pair.token0Reserve, pair.token0Decimals) } { pair.token0Symbol }</td>
+                  <td>{ ethers.utils.formatUnits(pair.token1Reserve, pair.token1Decimals) } { pair.token1Symbol }</td>
+                  <td>{ ethers.utils.formatUnits(pair.liquidityTokenOwned, 18) }</td>
+                </tr>
+              )
+            }
+          </tbody>
+        </Table>
+        {/* <Form>
           <Form.Group className="mb-3" controlId="token">
             <Form.Label>Token</Form.Label>
             <Form.Select value={liquidityFormState.tokenSymbol}
@@ -244,7 +309,7 @@ function App() {
           <Button variant="primary" type="submit" disabled={busy}>
             Submit
           </Button>
-        </Form>
+        </Form> */}
       </Accordion.Body>
     </Accordion.Item>
 
