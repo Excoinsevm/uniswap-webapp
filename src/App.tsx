@@ -6,7 +6,7 @@ import Immutable from 'immutable';
 import { Navbar, Container, Accordion, Button, Form } from 'react-bootstrap'
 
 import { ethers, BigNumber } from "ethers";
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 import erc20 from '@lobanov/uniswap-v2-periphery/build/ERC20.json';
 import uniswapV2Router from '@lobanov/uniswap-v2-periphery/build/UniswapV2Router02.json';
@@ -40,6 +40,13 @@ interface IAddTokenFormState {
   contractAddress: string
 }
 
+interface ILiquidityFormState {
+  tokenSymbol: string,
+  wethPairAddress?: string,
+  ownedLiquidityBalance?: BigNumber,
+  currentPrice?: BigNumber
+}
+
 function App() {
   const provider = new ethers.providers.Web3Provider(window.ethereum);
   const uniswapFactoryContract = new ethers.Contract(process.env.REACT_APP_FACTORY_CONTRACT, uniswapV2Factory.abi, provider);
@@ -56,6 +63,7 @@ function App() {
   const [ walletAssets, setWalletAssets ] = useState(Immutable.Map<string, IWalletAsset>());
 
   const [ tokenAddressFormState, setTokenAddressFormState ] = useState<IAddTokenFormState>({ contractAddress: "" });
+  const [ liquidityFormState, setLiquidityFormState ] = useState<ILiquidityFormState>({} as ILiquidityFormState);
 
   async function connectToMetaMask() {
     console.log("Connecting to MetaMask");
@@ -154,6 +162,16 @@ function App() {
     setBusy(false);
   }
 
+  function updateLiquidityFormState(event: React.SyntheticEvent, property: string) {
+    event.preventDefault();
+
+    const target = event.target as HTMLInputElement;
+    setLiquidityFormState((prevState) => ({
+      ...prevState,
+      [property]: target.value,
+    }))
+  }
+
   const TokensAndBalancesTab = () =>
     <Accordion.Item eventKey="0">
       <Accordion.Header>Tokens and balances</Accordion.Header>
@@ -187,7 +205,46 @@ function App() {
     <Accordion.Item eventKey="1">
       <Accordion.Header>Liquidity</Accordion.Header>
       <Accordion.Body>
-        <p>Pairs and reserves</p>
+        <p>This app only supports adding liquidity for trading tokens for ether.</p>
+        <p>Select a token to see its liquidity pool status.</p>
+        <Form>
+          <Form.Group className="mb-3" controlId="token">
+            <Form.Label>Token</Form.Label>
+            <Form.Select value={liquidityFormState.tokenSymbol}
+                onChange={(e) => updateLiquidityFormState(e, 'tokenSymbol')}
+                disabled={busy}>
+              <option>TEST</option>
+            </Form.Select>
+            <Form.Text className="text-muted">
+              Change to see liquidity details.
+            </Form.Text>
+          </Form.Group>
+        </Form>
+        <p>Pair WETH-TEST address: 0x000</p>
+        <p>Liquidity tokens owned: 123</p>
+        <p>Current price: 1 TEST = 1.234 WETH</p>
+        <p>Add liquidity (slippage tolerance is 5%):</p>
+        <Form onSubmit={handleAddToken}>
+          <Form.Group className="mb-3" controlId="formBasicEmail">
+            <Form.Label>Amount of TEST</Form.Label>
+            <Form.Control value={tokenAddressFormState.contractAddress}
+                onChange={(e) => updateTokenAddressFormState(e, 'contractAddress')}
+                disabled={busy}
+                type="string"
+                placeholder="Enter ERC20 contract address starting with 0x" />
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="formBasicEmail">
+            <Form.Label>Amount of WETH</Form.Label>
+            <Form.Control value={tokenAddressFormState.contractAddress}
+                onChange={(e) => updateTokenAddressFormState(e, 'contractAddress')}
+                disabled={busy}
+                type="string"
+                placeholder="Enter ERC20 contract address starting with 0x" />
+          </Form.Group>
+          <Button variant="primary" type="submit" disabled={busy}>
+            Submit
+          </Button>
+        </Form>
       </Accordion.Body>
     </Accordion.Item>
 
