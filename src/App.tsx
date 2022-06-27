@@ -53,7 +53,7 @@ function App() {
   const [ selectedAccount, setSelectedAccount ] = useState("");
   const [ accountBalance, setAccountBalance ] = useState("");
 
-  const [ walletAssets, setWalletAssets ] = useState<IWalletAsset[]>([] as IWalletAsset[]);
+  const [ walletAssets, setWalletAssets ] = useState(Immutable.Map<string, IWalletAsset>());
 
   const [ tokenAddressFormState, setTokenAddressFormState ] = useState<IAddTokenFormState>({ contractAddress: "" });
 
@@ -98,11 +98,10 @@ function App() {
 
   function addWalletAsset(asset: IWalletAsset) {
     setWalletAssets((prev) => {
-      if (prev.find((v) => v.symbol === asset.symbol)) {
-        return prev;
-      } else {
-        return [ ...prev, asset ];
+      if (!prev.has(asset.symbol)) {
+        return prev.set(asset.symbol, asset);
       }
+      return prev;
     });
   }
 
@@ -125,7 +124,7 @@ function App() {
   }
 
   function WalletAssets() {
-    const items = walletAssets.map((asset) =>
+    const items = walletAssets.valueSeq().map((asset) =>
       <li key={asset.symbol}>
         <b>{ asset.symbol }</b>{ ': ' + ethers.utils.formatUnits(asset.balance, asset.decimals) }
       </li>
