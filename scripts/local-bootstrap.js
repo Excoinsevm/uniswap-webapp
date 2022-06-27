@@ -11,7 +11,8 @@ const fs = require('fs/promises');
 async function main() {
   const allSigners = await hre.ethers.getSigners();
   const deployingSigner = allSigners[0];
-  console.log(`All deployed contracts will be signed by ${deployingSigner.address}`);
+  const myAddress = deployingSigner.address;
+  console.log(`All deployed contracts will be signed by ${myAddress}`);
 
   const weth9Factory = new ContractFactory(weth9Artifact.abi, weth9Artifact.bytecode, deployingSigner);
   const uniswapV2FactoryFactory = new ContractFactory(uniswapV2FactoryArtifact.abi, uniswapV2FactoryArtifact.bytecode, deployingSigner);
@@ -52,8 +53,24 @@ async function main() {
     `REACT_APP_BOOTSTRAP_ERC20_CONTRACTS=${ testTokenContract.address }\n`,
   ]
   await fs.writeFile('.env.development.local', env);
+
+  // provide the initial liquidity to Uniswap protocol
+  const approveTx = await testTokenContract.approve(uniswapV2RouterContract.address, balanceRaw);
+  await approveTx.wait();
+  console.log(`Gave router the allowance to use full balance of ${symbol}`);
+
+  // const wethToTestPair = await Fetcher.fetchPairData(wethToken, testToken, provider);
+  const liquidityTx = await uniswapV2RouterContract.addLiquidityETH(
+    /* token */ testTokenContract.address,
+    /* amountTokenDesired */ BigNumber.from(500).mul(constants.WeiPerEther),
+    /* amountTokenMin */ BigNumber.from(500).mul(constants.WeiPerEther),
+    /* amountETHMin */ BigNumber.from(500).mul(constants.WeiPerEther),
+    /* liquidityTo */ myAddress,
+    /* deadline (10 min) */ Math.floor( Date.now() / 1000) + 600,
+    { /* amountETHDesired */ value: BigNumber.from(500).mul(constants.WeiPerEther), gasLimit: 30000000 });
+  await liquidityTx.wait();
 }
-  
+
 main()
   .then(() => process.exit(0))
   .catch((error) => {
