@@ -125,6 +125,50 @@ function App() {
     addWalletAsset(asset);
   }
 
+  const TokensAndBalances = () =>
+    <Accordion.Item eventKey="0">
+      <Accordion.Header>Tokens and balances</Accordion.Header>
+      <Accordion.Body>
+        <p>Uniswap V2 Factory contract @ { process.env.REACT_APP_FACTORY_CONTRACT }</p>
+        <p>Uniswap V2 Router contract @ { process.env.REACT_APP_ROUTER_CONTRACT }</p>
+        <p>Token balances in your wallet:</p>
+        <WalletAssets />
+        <p>The above shows balances of all tokens for which there is a liquidity pool, plus a few standard ones.</p>
+        <p>Use this form to add more ERC-20 token contracts, which could be used in other operations:</p>
+        <Form onSubmit={handleAddToken}>
+          <Form.Group className="mb-3" controlId="formBasicEmail">
+            <Form.Label>Contract address</Form.Label>
+            <Form.Control value={tokenAddressFormState.contractAddress}
+                onChange={(e) => updateTokenAddressFormState(e, 'contractAddress')}
+                type="string" placeholder="Enter ERC20 contract address starting with 0x" />
+            <Form.Text className="text-muted">
+              E.g. WETH9 contract is deployed @ { process.env.REACT_APP_WETH_CONTRACT }
+            </Form.Text>
+          </Form.Group>
+          <Button variant="primary" type="submit">
+            Submit
+          </Button>
+        </Form>
+      </Accordion.Body>
+    </Accordion.Item>
+
+  function WorkingArea() {
+    if (!connected) {
+      return <p>Not connect to a provider</p>
+    }
+    return <Accordion defaultActiveKey="0">
+      <TokensAndBalances />
+      <Accordion.Item eventKey="1">
+        <Accordion.Header>Add liquidity</Accordion.Header>
+        <Accordion.Body>Lorem ipsum</Accordion.Body>
+      </Accordion.Item>
+      <Accordion.Item eventKey="2">
+        <Accordion.Header>Exchange</Accordion.Header>
+        <Accordion.Body>Lorem ipsum</Accordion.Body>
+      </Accordion.Item>
+    </Accordion>
+  }
+
   return (
     <Container>
       <Navbar bg="light">
@@ -137,41 +181,7 @@ function App() {
           </Navbar.Collapse>
         </Container>
       </Navbar>
-      <Accordion defaultActiveKey="0">
-        <Accordion.Item eventKey="0">
-          <Accordion.Header>Contracts and tokens</Accordion.Header>
-          <Accordion.Body>
-            <p>Uniswap V2 Factory contract @ { process.env.REACT_APP_FACTORY_CONTRACT }</p>
-            <p>Uniswap V2 Router contract @ { process.env.REACT_APP_ROUTER_CONTRACT }</p>
-            <p>Token balances in your wallet:</p>
-            <WalletAssets />
-            <p>The above shows balances of all tokens for which there is a liquidity pool, plus a few standard ones.</p>
-            <p>Use this form to add more ERC-20 token contracts, which could be used in other operations:</p>
-            <Form onSubmit={handleAddToken}>
-              <Form.Group className="mb-3" controlId="formBasicEmail">
-                <Form.Label>Contract address</Form.Label>
-                <Form.Control value={tokenAddressFormState.contractAddress}
-                    onChange={(e) => updateTokenAddressFormState(e, 'contractAddress')}
-                    type="string" placeholder="Enter ERC20 contract address starting with 0x" />
-                <Form.Text className="text-muted">
-                  E.g. WETH9 contract is deployed @ { process.env.REACT_APP_WETH_CONTRACT }
-                </Form.Text>
-              </Form.Group>
-              <Button variant="primary" type="submit">
-                Submit
-              </Button>
-            </Form>
-          </Accordion.Body>
-        </Accordion.Item>
-        <Accordion.Item eventKey="1">
-          <Accordion.Header>Add liquidity</Accordion.Header>
-          <Accordion.Body>Lorem ipsum</Accordion.Body>
-        </Accordion.Item>
-        <Accordion.Item eventKey="2">
-          <Accordion.Header>Exchange</Accordion.Header>
-          <Accordion.Body>Lorem ipsum</Accordion.Body>
-        </Accordion.Item>
-      </Accordion>
+      <WorkingArea />      
     </Container>
   );
 }
