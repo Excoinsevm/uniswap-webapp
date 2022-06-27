@@ -1,12 +1,17 @@
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.css';
 
+import Immutable from 'immutable';
+
 import { Navbar, Container, Accordion, Button, Form } from 'react-bootstrap'
 
 import { ethers, BigNumber } from "ethers";
 import { useState } from 'react';
 
 import erc20 from '@lobanov/uniswap-v2-periphery/build/ERC20.json';
+import uniswapV2Router from '@lobanov/uniswap-v2-periphery/build/UniswapV2Router02.json';
+import uniswapV2Pair from '@lobanov/uniswap-v2-core/build/UniswapV2Pair.json';
+import uniswapV2Factory from '@lobanov/uniswap-v2-core/build/UniswapV2Factory.json';
 
 declare global {
   namespace NodeJS {
@@ -37,6 +42,8 @@ interface IAddTokenFormState {
 
 function App() {
   const provider = new ethers.providers.Web3Provider(window.ethereum);
+  const uniswapFactoryContract = new ethers.Contract(process.env.REACT_APP_FACTORY_CONTRACT, uniswapV2Factory.abi, provider);
+  const uniswapRouterContract = new ethers.Contract(process.env.REACT_APP_ROUTER_CONTRACT, uniswapV2Router.abi, provider);
 
   // operation tabs are not visible unless connected to the wallet
   const [ connected, setConnected ] = useState(false);
@@ -58,13 +65,31 @@ function App() {
     const ethBalance = await provider.getBalance(myAccount);
     setAccountBalance(ethers.utils.formatEther(ethBalance));
 
-    const bootstrapTokenContracts = process.env.REACT_APP_BOOTSTRAP_ERC20_CONTRACTS.split(',');
-    console.log('Bootstrap token contracts', bootstrapTokenContracts);
+    const bootstrapTokenContractAddresses = process.env.REACT_APP_BOOTSTRAP_ERC20_CONTRACTS.split(',');
+    console.log('Bootstrap token contract addresses:', bootstrapTokenContractAddresses);
 
-    const tokenContracts = bootstrapTokenContracts.map((address) => 
+    // obtain all uniswap pairs and lookup their tokens
+    const knownPairsCount = await uniswapFactoryContract.allPairsLength();
+    const knownPairAddresses = await Promise.all(
+      Array.from(Array(knownPairsCount).keys()) // 0 ... pairsCount - 1
+        .map((index) => 
+          uniswapFactoryContract.allPairs(index) as Promise<string>
+        )
+      );
+    const knownTokenContractsAddresses = await Promise.all(
+      knownPairAddresses.flatMap((pairAddress) => {
+          const pairContract = new ethers.Contract(pairAddress, uniswapV2Pair.abi, provider);
+          return [ pairContract.token0() as Promise<string>, pairContract.token1() as Promise<string> ];
+        })
+      );
+    console.log('Token contract addresses known to Uniswap:', knownTokenContractsAddresses);
+
+    // deduplicate
+    const allTokenContractAddresses = Immutable.Set<string>(bootstrapTokenContractAddresses.concat(knownTokenContractsAddresses));
+    const allTokenContracts = allTokenContractAddresses.map((address) => 
       new ethers.Contract(address, erc20.abi, provider));
 
-    const assets = await Promise.all(tokenContracts.map(async (contract) => describeWalletAsset(contract, myAccount)));
+    const assets = await Promise.all(allTokenContracts.map(async (contract) => describeWalletAsset(contract, myAccount)));
     assets.forEach(addWalletAsset);
 
     // make operation tabs visible
