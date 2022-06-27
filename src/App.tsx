@@ -147,8 +147,31 @@ function App() {
     setLiquidityPairs((prev) => prev.set(pair.name, pair));
   }
 
-  function handleAddLiquidity(command: IAddLiquidityCommand) {
+  async function handleAddLiquidity(command: IAddLiquidityCommand) {
     setBusy(true);
+
+    const asset = walletAssets.get(command.tokenAddress);
+    if (asset !== undefined) {
+      const balanceToTransfer = command.tokenToAdd;
+      const signer = provider.getSigner();
+
+      const assetContract = new ethers.Contract(asset.address, erc20.abi, signer);
+      const approveTx = await assetContract.approve(uniswapRouterContract.address, balanceToTransfer);
+      console.log("Approval transaction:", approveTx);
+      await approveTx.wait();
+
+      const liquidityTx = await uniswapRouterContract.connect(signer).addLiquidityETH(
+        /* token */ asset.address,
+        /* amountTokenDesired */ balanceToTransfer,
+        /* amountTokenMin */ balanceToTransfer,
+        /* amountETHMin */ command.etherToAdd,
+        /* liquidityTo */ selectedAccount,
+        /* deadline (10 min) */ Math.floor( Date.now() / 1000) + 600,
+        { /* amountETHDesired */ value: command.etherToAdd,  gasLimit: 30000000 });
+      console.log("Adding liquidity transaction:", approveTx);
+      await liquidityTx.wait();
+    
+    }
 
     setBusy(false);
   }
