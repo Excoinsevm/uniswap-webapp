@@ -12,7 +12,6 @@ import erc20 from '@lobanov/uniswap-v2-periphery/build/ERC20.json';
 import uniswapV2Router from '@lobanov/uniswap-v2-periphery/build/UniswapV2Router02.json';
 import uniswapV2Pair from '@lobanov/uniswap-v2-core/build/UniswapV2Pair.json';
 import uniswapV2Factory from '@lobanov/uniswap-v2-core/build/UniswapV2Factory.json';
-import { stat } from 'fs';
 
 declare global {
   namespace NodeJS {
