@@ -150,24 +150,34 @@ function App() {
   async function handleAddLiquidity(command: IAddLiquidityCommand) {
     setBusy(true);
 
+    const signer = provider.getSigner();
+
     const asset = walletAssets.get(command.tokenAddress);
     if (asset !== undefined) {
-      const balanceToTransfer = command.tokenToAdd;
-      const signer = provider.getSigner();
+      const balanceToAdd = command.tokenToAdd;
+      const balanceToAddMin = balanceToAdd.div(100).mul(95);
+      const etherToAdd = command.etherToAdd;
+      const etherToAddMin = etherToAdd.div(100).mul(95);
+      console.log("Adding liquidity:", {
+        balanceToAdd: balanceToAdd.toString(),
+        balanceToAddMin: balanceToAddMin.toString(),
+        etherToAdd: etherToAdd.toString(),
+        etherToAddMin: etherToAddMin.toString()
+      });
 
       const assetContract = new ethers.Contract(asset.address, erc20.abi, signer);
-      const approveTx = await assetContract.approve(uniswapRouterContract.address, balanceToTransfer);
+      const approveTx = await assetContract.approve(uniswapRouterContract.address, balanceToAdd);
       console.log("Approval transaction:", approveTx);
       await approveTx.wait();
 
       const liquidityTx = await uniswapRouterContract.connect(signer).addLiquidityETH(
         /* token */ asset.address,
-        /* amountTokenDesired */ balanceToTransfer,
-        /* amountTokenMin */ balanceToTransfer,
-        /* amountETHMin */ command.etherToAdd,
+        /* amountTokenDesired */ balanceToAdd,
+        /* amountTokenMin */ balanceToAddMin,
+        /* amountETHMin */ etherToAddMin,
         /* liquidityTo */ selectedAccount,
         /* deadline (10 min) */ Math.floor( Date.now() / 1000) + 600,
-        { /* amountETHDesired */ value: command.etherToAdd,  gasLimit: 30000000 });
+        { /* amountETHDesired */ value: etherToAdd, gasLimit: 30000000 });
       console.log("Adding liquidity transaction:", approveTx);
       await liquidityTx.wait();
     
@@ -384,7 +394,7 @@ const LiquidityForm: FC<ILiquidityProps> = ({busy, liquidityPairs, walletAssets,
     if (liquidityFormState.tokenAsset !== undefined) {
       handleAddLiquidity({
         tokenAddress: liquidityFormState.tokenAddress,
-        tokenToAdd: BigNumber.from(liquidityFormState.tokenToAdd).mul(liquidityFormState.tokenAsset.decimals),
+        tokenToAdd: BigNumber.from(liquidityFormState.tokenToAdd).mul(liquidityFormState.tokenAsset.factor),
         etherToAdd: BigNumber.from(liquidityFormState.etherToAdd).mul(constants.WeiPerEther)
       } as IAddLiquidityCommand);
     }
