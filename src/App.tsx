@@ -4,7 +4,7 @@ import 'bootstrap/dist/css/bootstrap.css';
 import { Navbar, Container, Accordion, Button, Form } from 'react-bootstrap'
 
 import { ethers, BigNumber } from "ethers";
-import { Provider, useState } from 'react';
+import { useState } from 'react';
 
 import erc20 from '@lobanov/uniswap-v2-periphery/build/ERC20.json';
 
