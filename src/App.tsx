@@ -47,10 +47,17 @@ function App() {
         </Container>
       </Navbar>
       <Accordion>
-        <Accordion.Item eventKey="0">
-          <Accordion.Header>Token balances</Accordion.Header>
+        <Accordion.Item eventKey="2">
+          <Accordion.Header>Contracts</Accordion.Header>
           <Accordion.Body>
-            
+            <p>Uniswap V2 Factory contract @ { process.env.REACT_APP_FACTORY_CONTRACT }</p>
+            <p>Uniswap V2 Router contract @ { process.env.REACT_APP_ROUTER_CONTRACT }</p>
+          </Accordion.Body>
+        </Accordion.Item>
+        <Accordion.Item eventKey="0">
+          <Accordion.Header>Configure tokens</Accordion.Header>
+          <Accordion.Body>
+            <p>Use this section to find balances of tokens associated with your account</p>
           </Accordion.Body>
         </Accordion.Item>
         <Accordion.Item eventKey="1">
