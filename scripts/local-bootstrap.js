@@ -59,7 +59,6 @@ async function main() {
   await approveTx.wait();
   console.log(`Gave router the allowance to use full balance of ${symbol}`);
 
-  // const wethToTestPair = await Fetcher.fetchPairData(wethToken, testToken, provider);
   const liquidityTx = await uniswapV2RouterContract.addLiquidityETH(
     /* token */ testTokenContract.address,
     /* amountTokenDesired */ BigNumber.from(500).mul(constants.WeiPerEther),
