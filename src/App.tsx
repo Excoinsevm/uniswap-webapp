@@ -38,7 +38,11 @@ interface IAddTokenFormState {
 function App() {
   const provider = new ethers.providers.Web3Provider(window.ethereum);
 
+  // operation tabs are not visible unless connected to the wallet
   const [ connected, setConnected ] = useState(false);
+  // forms are disabled (busy) when waiting for the current transaction to get confirmed
+  const [ busy, setBusy ] = useState(false);
+
   const [ selectedAccount, setSelectedAccount ] = useState("");
   const [ accountBalance, setAccountBalance ] = useState("");
 
@@ -55,14 +59,15 @@ function App() {
     setAccountBalance(ethers.utils.formatEther(ethBalance));
 
     const bootstrapTokenContracts = process.env.REACT_APP_BOOTSTRAP_ERC20_CONTRACTS.split(',');
-
     console.log('Bootstrap token contracts', bootstrapTokenContracts);
+
     const tokenContracts = bootstrapTokenContracts.map((address) => 
       new ethers.Contract(address, erc20.abi, provider));
 
     const assets = await Promise.all(tokenContracts.map(async (contract) => describeWalletAsset(contract, myAccount)));
-    setWalletAssets(assets);
+    assets.forEach(addWalletAsset);
 
+    // make operation tabs visible
     setConnected(true);
   }
 
@@ -76,16 +81,14 @@ function App() {
     });
   }
 
-  function describeWalletAsset(contract: ethers.Contract, walletAddress: string): Promise<IWalletAsset> {
-    return Promise.all([ contract.symbol(), contract.decimals(), contract.balanceOf(walletAddress) ])
-      .then((results) => {
-        return {
-          address: contract.address,
-          symbol: results[0] as string,
-          decimals: results[1] as number,
-          balance: BigNumber.from(results[2])
-        } as IWalletAsset
-      })
+  async function describeWalletAsset(contract: ethers.Contract, walletAddress: string): Promise<IWalletAsset> {
+    const results = await Promise.all([contract.symbol(), contract.decimals(), contract.balanceOf(walletAddress)]);
+    return {
+      address: contract.address,
+      symbol: results[0] as string,
+      decimals: results[1] as number,
+      balance: BigNumber.from(results[2])
+    } as IWalletAsset;
   }
 
   function UserInfo() {
@@ -116,6 +119,7 @@ function App() {
   }
 
   async function handleAddToken(event: React.FormEvent) {
+    setBusy(true);
     event.preventDefault();
 
     const tokenContract = new ethers.Contract(tokenAddressFormState.contractAddress, erc20.abi, provider);
@@ -123,9 +127,10 @@ function App() {
     console.log("Adding new ERC20 asset: ", asset);
 
     addWalletAsset(asset);
+    setBusy(false);
   }
 
-  const TokensAndBalances = () =>
+  const TokensAndBalancesTab = () =>
     <Accordion.Item eventKey="0">
       <Accordion.Header>Tokens and balances</Accordion.Header>
       <Accordion.Body>
@@ -140,16 +145,32 @@ function App() {
             <Form.Label>Contract address</Form.Label>
             <Form.Control value={tokenAddressFormState.contractAddress}
                 onChange={(e) => updateTokenAddressFormState(e, 'contractAddress')}
-                type="string" placeholder="Enter ERC20 contract address starting with 0x" />
+                disabled={busy}
+                type="string"
+                placeholder="Enter ERC20 contract address starting with 0x" />
             <Form.Text className="text-muted">
               E.g. WETH9 contract is deployed @ { process.env.REACT_APP_WETH_CONTRACT }
             </Form.Text>
           </Form.Group>
-          <Button variant="primary" type="submit">
+          <Button variant="primary" type="submit" disabled={busy}>
             Submit
           </Button>
         </Form>
       </Accordion.Body>
+    </Accordion.Item>
+
+  const LiquidityTab = () =>
+    <Accordion.Item eventKey="1">
+      <Accordion.Header>Liquidity</Accordion.Header>
+      <Accordion.Body>
+        <p>Pairs and reserves</p>
+      </Accordion.Body>
+    </Accordion.Item>
+
+  const TradeTab = () =>
+    <Accordion.Item eventKey="2">
+      <Accordion.Header>Trading</Accordion.Header>
+      <Accordion.Body>Lorem ipsum</Accordion.Body>
     </Accordion.Item>
 
   function WorkingArea() {
@@ -157,15 +178,9 @@ function App() {
       return <p>Not connect to a provider</p>
     }
     return <Accordion defaultActiveKey="0">
-      <TokensAndBalances />
-      <Accordion.Item eventKey="1">
-        <Accordion.Header>Add liquidity</Accordion.Header>
-        <Accordion.Body>Lorem ipsum</Accordion.Body>
-      </Accordion.Item>
-      <Accordion.Item eventKey="2">
-        <Accordion.Header>Exchange</Accordion.Header>
-        <Accordion.Body>Lorem ipsum</Accordion.Body>
-      </Accordion.Item>
+      <TokensAndBalancesTab />
+      <LiquidityTab />
+      <TradeTab />
     </Accordion>
   }
 
