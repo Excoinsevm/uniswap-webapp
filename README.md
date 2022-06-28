@@ -18,6 +18,16 @@ The following assumes the use of `node@>=10`.
 
 ### Install Dependencies
 
+This project has dependencies that are hosted in GitHub npm registry. In order to install all dependencies you need to create a personal access token (PAT) and use it to log into the GitHub registry:
+
+```
+$ npm login --scope=@lobanov --registry=https://npm.pkg.github.com
+
+> Username: GITHUB USERNAME
+> Password: GITHUB TOKEN
+> Email: PUBLIC-EMAIL-ADDRESS
+```
+
 `npm install`
 
 ### Run Harthat Network locally
