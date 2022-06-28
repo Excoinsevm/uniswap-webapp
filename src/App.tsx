@@ -13,6 +13,8 @@ import uniswapV2Router from '@lobanov/uniswap-v2-periphery/build/UniswapV2Router
 import uniswapV2Pair from '@lobanov/uniswap-v2-core/build/UniswapV2Pair.json';
 import uniswapV2Factory from '@lobanov/uniswap-v2-core/build/UniswapV2Factory.json';
 
+import { Fraction } from '@uniswap/sdk'
+
 declare global {
   namespace NodeJS {
     export interface ProcessEnv {
@@ -48,8 +50,8 @@ interface ILiquidityPair {
   token0Reserve: BigNumber,
   token1Reserve: BigNumber,
   liquidityTokenOwned: BigNumber,
-  reserveRatio: BigNumber,
-  tokenPriceInEther: BigNumber
+  reserveRatio: Fraction,
+  tokenPriceInEther: Fraction
 }
 
 function App() {
@@ -75,6 +77,12 @@ function App() {
     setSelectedAccount(myAccount);
     const ethBalance = await provider.getBalance(myAccount);
     setAccountEtherBalance(ethBalance);
+
+    // automatically update account ETH balance
+    // provider.on(myAccount, (balance) => {
+    //   console.log(`Account ETH balance updated to ${balance}`)
+    //   setAccountEtherBalance(balance);
+    // });
 
     const bootstrapTokenContractAddresses = process.env.REACT_APP_BOOTSTRAP_ERC20_CONTRACTS.split(',');
     console.log('Bootstrap token contract addresses:', bootstrapTokenContractAddresses);
@@ -147,6 +155,7 @@ function App() {
   }
 
   function putLiquidityPair(pair: ILiquidityPair) {
+    console.log("Adding liquidity pair", pair);
     setLiquidityPairs((prev) => prev.set(pair.name, pair));
   }
 
@@ -203,6 +212,12 @@ function App() {
     const reserves = results[2] as Array<any>;
     const token0Reserve = reserves[0] as BigNumber;
     const token1Reserve = reserves[1] as BigNumber;
+
+    const reserveRatio = new Fraction(token0Reserve.toBigInt(), token1Reserve.toBigInt());
+    const tokenPriceInEther = (token0Address === process.env.REACT_APP_WETH_CONTRACT)? reserveRatio.invert(): reserveRatio;
+
+    console.log({token0Symbol, token1Symbol, reserveRatio: reserveRatio.toSignificant(3), tokenPriceInEther: tokenPriceInEther.toSignificant(3)});
+
     return {
       name: `${token0Symbol}-${token1Symbol}`,
       token0Address,
@@ -213,10 +228,9 @@ function App() {
       token1Decimals: assets.get(token1Address)?.decimals,
       token0Reserve,
       token1Reserve,
-      reserveRatio: token0Reserve.div(token1Reserve),
+      reserveRatio,
+      tokenPriceInEther,
       liquidityTokenOwned: results[3] as BigNumber,
-      tokenPriceInEther: (token0Address === process.env.REACT_APP_WETH_CONTRACT)?
-        token1Reserve.div(token0Reserve) : token0Reserve.div(token1Reserve)
     } as ILiquidityPair;
   }
 
@@ -523,7 +537,7 @@ const LiquidityForm: FC<ILiquidityProps> = ({busy, liquidityPairs, walletAssets,
                 <td>{ pair.name }</td>
                 <td>{ ethers.utils.formatUnits(pair.token0Reserve, pair.token0Decimals) } { pair.token0Symbol }</td>
                 <td>{ ethers.utils.formatUnits(pair.token1Reserve, pair.token1Decimals) } { pair.token1Symbol }</td>
-                <td>{ pair.reserveRatio.toString() }</td>
+                <td>{ pair.reserveRatio.toSignificant(3) }</td>
                 <td>{ ethers.utils.formatUnits(pair.liquidityTokenOwned, 18) }</td>
               </tr>
             )
@@ -628,7 +642,10 @@ const TradingForm: FC<ITradingFormProps> = ({busy, walletAssets, liquidityPairs,
 
       if (state.liquidityPair !== undefined && state.tokenAsset !== undefined) {
         const tokenAmount = BigNumber.from(state.tokenAmount).mul(state.tokenAsset.factor);
-        const etherEstimate = state.liquidityPair.tokenPriceInEther.mul(tokenAmount);
+        const tokenPrice = state.liquidityPair.tokenPriceInEther;
+        const etherEstimate = BigNumber.from(tokenPrice.multiply(tokenAmount.toBigInt()).toFixed(0));
+
+        console.log({tokenAmount: tokenAmount.toString(), etherEstimate: etherEstimate.toString()})
 
         if (state.operation === 'buy') {
           // max ether to spend
