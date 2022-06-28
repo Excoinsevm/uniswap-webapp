@@ -39,6 +39,8 @@ interface IWalletAsset {
 
 interface ILiquidityPair {
   name: string,
+  token0Address: string,
+  token1Address: string,
   token0Symbol: string,
   token1Symbol: string,
   token0Decimals: number,
@@ -46,7 +48,8 @@ interface ILiquidityPair {
   token0Reserve: BigNumber,
   token1Reserve: BigNumber,
   liquidityTokenOwned: BigNumber,
-  reserveRatio: BigNumber
+  reserveRatio: BigNumber,
+  tokenPriceInEther: BigNumber
 }
 
 function App() {
@@ -202,6 +205,8 @@ function App() {
     const token1Reserve = reserves[1] as BigNumber;
     return {
       name: `${token0Symbol}-${token1Symbol}`,
+      token0Address,
+      token1Address,
       token0Symbol,
       token1Symbol,
       token0Decimals: assets.get(token0Address)?.decimals,
@@ -209,8 +214,60 @@ function App() {
       token0Reserve,
       token1Reserve,
       reserveRatio: token0Reserve.div(token1Reserve),
-      liquidityTokenOwned: results[3] as BigNumber
+      liquidityTokenOwned: results[3] as BigNumber,
+      tokenPriceInEther: (token0Address === process.env.REACT_APP_WETH_CONTRACT)?
+        token1Reserve.div(token0Reserve) : token0Reserve.div(token1Reserve)
     } as ILiquidityPair;
+  }
+
+  async function handleTrade(command: ITradeCommand) {
+    setBusy(true);
+
+    const signer = provider.getSigner();
+
+    const asset = walletAssets.get(command.tokenAddress);
+    if (asset !== undefined) {
+      const tokenAmount = command.tokenAmount;
+
+      if (command.operation === 'buy') {
+        // const amountInMax = etherToAdd.div(100).mul(105);
+        // const path = [ process.env.REACT_APP_WETH_CONTRACT, command.tokenAddress ];
+
+        // console.log("Preparing swapETHForExactTokens:", {
+        //   amountOut: tokenAmount.toString(),
+        //   amountInMax: amountInMax.toString(),
+        //   path
+        // });
+
+      } else if (command.operation === 'sell') {
+
+        const path = [ command.tokenAddress, process.env.REACT_APP_WETH_CONTRACT ];
+
+        console.log("Preparing swapExactTokensForETH:", {
+          amountIn: tokenAmount.toString(),
+          amountOutMin: command.etherAmount.toString(),
+          path
+        });
+
+        const assetContract = new ethers.Contract(asset.address, erc20.abi, signer);
+        const approveTx = await assetContract.approve(uniswapRouterContract.address, tokenAmount);
+        console.log("Approval transaction:", approveTx);
+        await approveTx.wait();
+  
+        const liquidityTx = await uniswapRouterContract.connect(signer).swapExactTokensForETH(
+          /* amountIn */ tokenAmount,
+          /* amountOutMin */ command.etherAmount,
+          /* path */ path,
+          /* to */ selectedAccount,
+          /* deadline (10 min) */ Math.floor( Date.now() / 1000) + 600,
+          { gasLimit: 30000000 });
+
+        console.log("Executing transaction:", approveTx);
+        await liquidityTx.wait();
+      }
+    }
+
+    setBusy(false);
   }
 
   return (
@@ -228,10 +285,17 @@ function App() {
       <WorkingArea connected={connected} busy={busy}
         etherBalance={accounEtherBalance}
         walletAssets={walletAssets} handleAddToken={handleAddToken} 
-        liquidityPairs={liquidityPairs} handleAddLiquidity={handleAddLiquidity}/>
+        liquidityPairs={liquidityPairs} handleAddLiquidity={handleAddLiquidity}
+        handleTrade={handleTrade} />
     </Container>
   );
 }
+
+/**
+ * ============================
+ * User login and welcome
+ * ============================
+ */
 
 interface IUserWelcomeProps {
   connected: boolean,
@@ -247,16 +311,23 @@ const UserWelcome: FC<IUserWelcomeProps> = ({connected, account, onConnect}) => 
   }
 }
 
+/**
+ * ============================
+ * Accordion with all forms
+ * ============================
+ */
+
 interface IWorkingAreaProps extends ITokensAndBalancesProps {
   connected: boolean;
   etherBalance: BigNumber;
   walletAssets: Immutable.Map<string, IWalletAsset>,
   handleAddToken: (address: string) => void,
   liquidityPairs: Immutable.Map<string, ILiquidityPair>,
-  handleAddLiquidity: (command: IAddLiquidityCommand) => void
+  handleAddLiquidity: (command: IAddLiquidityCommand) => void,
+  handleTrade: (command: ITradeCommand) => void
 }
 
-const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, etherBalance, walletAssets, handleAddToken, liquidityPairs, handleAddLiquidity}) => {
+const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, etherBalance, walletAssets, handleAddToken, liquidityPairs, handleAddLiquidity, handleTrade}) => {
   if (!connected) {
     return <p>Not connect to a provider</p>
   }
@@ -278,9 +349,23 @@ const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, etherBalance, wall
             liquidityPairs={liquidityPairs} handleAddLiquidity={handleAddLiquidity} />
         </Accordion.Body>
       </Accordion.Item>
+      <Accordion.Item eventKey="trading">
+        <Accordion.Header>Trading</Accordion.Header>
+        <Accordion.Body>
+          <TradingForm busy={busy}
+            walletAssets={walletAssets.filterNot((asset) => asset.symbol === 'WETH')}
+            liquidityPairs={liquidityPairs} handleTrade={handleTrade} />
+        </Accordion.Body>
+      </Accordion.Item>
     </Accordion>
   );
 }
+
+/**
+ * ============================
+ * Token contracts and balances
+ * ============================
+ */
 
 interface ITokensAndBalancesProps {
   busy: boolean;
@@ -338,9 +423,6 @@ const TokensAndBalancesForm: FC<ITokensAndBalancesProps> = ({busy, etherBalance,
               disabled={busy}
               type="string"
               placeholder="Enter ERC20 contract address starting with 0x" />
-          <Form.Text className="text-muted">
-            E.g. WETH9 contract is deployed @ { process.env.REACT_APP_WETH_CONTRACT }
-          </Form.Text>
         </Form.Group>
         <Button variant="primary" type="submit" disabled={busy}>
           Submit
@@ -349,6 +431,12 @@ const TokensAndBalancesForm: FC<ITokensAndBalancesProps> = ({busy, etherBalance,
     </Container>
   )
 }
+
+/**
+ * ============================
+ * Liquidity instruction panel
+ * ============================
+ */
 
 interface IAddLiquidityCommand {
   tokenAddress: string,
@@ -463,6 +551,156 @@ const LiquidityForm: FC<ILiquidityProps> = ({busy, liquidityPairs, walletAssets,
               type="string"/>
         </Form.Group>
         <Button variant="primary" type="submit" disabled={busy}>
+          Submit
+        </Button>
+      </Form>
+    </Container>
+  )
+}
+
+/**
+ * ==========================
+ * Trading instruction panel
+ * ==========================
+ */
+
+interface ITradeCommand {
+  operation: 'buy' | 'sell';
+  tokenAddress: string;
+  tokenAmount: BigNumber;
+  etherAmount: BigNumber; // outMin when selling, in when buying
+}
+
+interface ITradingFormProps {
+  busy: boolean;
+  walletAssets: Immutable.Map<string, IWalletAsset>;
+  liquidityPairs: Immutable.Map<string, ILiquidityPair>;
+  handleTrade: (command: ITradeCommand) => void;
+}
+
+interface ITradingFormState {
+  operation: 'buy' | 'sell';
+  tokenAsset?: IWalletAsset;
+  liquidityPair?: ILiquidityPair;
+  tokenAddress: string;
+  tokenAmount: number;
+  etherAmount: BigNumber;
+}
+
+const TradingForm: FC<ITradingFormProps> = ({busy, walletAssets, liquidityPairs, handleTrade}) => {
+  const firstToken = walletAssets.get(walletAssets.keySeq().first());
+  const [ tradingFormState, setTradingFormState ] = useState<ITradingFormState>({
+    tokenAddress: firstToken?.address,
+    tokenAsset: firstToken,
+    operation: 'buy',
+    tokenAmount: 0,
+    etherAmount: constants.Zero,
+    liquidityPair: findLiquidityPair(firstToken?.address, liquidityPairs)
+  } as ITradingFormState);
+
+  function findLiquidityPair(tokenAddress: string | undefined, liquidityPairs: Immutable.Map<string, ILiquidityPair>): ILiquidityPair | undefined {
+    if (tokenAddress !== undefined) {
+      return liquidityPairs.valueSeq().find((pair) =>
+        (pair.token0Address === process.env.REACT_APP_WETH_CONTRACT && pair.token1Address === tokenAddress) ||
+        (pair.token0Address === tokenAddress && pair.token1Address === process.env.REACT_APP_WETH_CONTRACT)
+      );
+    }
+  }
+
+  function updateTradingFormState(event: React.SyntheticEvent, property: string) {
+    event.preventDefault();
+
+    const target = event.target as HTMLInputElement;
+    setTradingFormState((prevState) => {
+      const state = { ...prevState, [property]: target.value }
+
+      // recalculate all derived values on any change
+      state.tokenAsset = walletAssets.get(state.tokenAddress);
+      state.liquidityPair = findLiquidityPair(state.tokenAddress, liquidityPairs);
+
+      if (state.liquidityPair !== undefined && state.tokenAsset !== undefined) {
+        const tokenAmount = BigNumber.from(state.tokenAmount).mul(state.tokenAsset.factor);
+        const etherEstimate = state.liquidityPair.tokenPriceInEther.mul(tokenAmount);
+
+        if (state.operation === 'buy') {
+          // max ether to spend
+          state.etherAmount = etherEstimate.div(100).mul(105);
+        } else {
+          // min ether to receive
+          state.etherAmount = etherEstimate.div(100).mul(95);
+        }
+      }
+
+      return state;
+    });
+  }
+
+  function handleTradeSubmit(event: React.FormEvent) {
+    event.preventDefault();
+
+    console.log("Executing a trade", tradingFormState);
+
+    if (tradingFormState.tokenAsset !== undefined) {
+      handleTrade({
+        operation: tradingFormState.operation,
+        tokenAddress: tradingFormState.tokenAddress,
+        tokenAmount: BigNumber.from(tradingFormState.tokenAmount).mul(tradingFormState.tokenAsset.factor),
+        etherAmount: tradingFormState.etherAmount
+      } as ITradeCommand);
+    }
+  }
+
+  return (
+    <Container>
+      <p>Execute a swap. This form only allowing buying and selling tokens for ETH with maximum slippage of 5%.</p>
+      <Form onSubmit={handleTradeSubmit}>
+        <Form.Group className="mb-3" controlId="formTradingOperation">
+          <Form.Label>Choose operation type</Form.Label>
+          <Form.Select value={tradingFormState.operation}
+              onChange={(e) => updateTradingFormState(e, 'operation')}
+              disabled={busy}>
+            <option>buy</option>
+            <option>sell</option>
+          </Form.Select>
+        </Form.Group>
+        <Form.Group className="mb-3" controlId="formTradingToken">
+          <Form.Label>Select a token to {tradingFormState.operation}</Form.Label>
+          <Form.Select value={tradingFormState.tokenAddress}
+              onChange={(e) => updateTradingFormState(e, 'tokenAddress')}
+              disabled={busy}>
+            {
+              walletAssets.valueSeq().map((asset) => 
+                <option key={asset.address} value={asset.address}>{asset.symbol}</option>
+              )
+            }
+          </Form.Select>
+          <Form.Text className="text-muted">
+            {
+              tradingFormState.liquidityPair?
+                `This trade will use liquidity pair ${tradingFormState.liquidityPair?.name}` :
+                'Unable to trade, no such liquidity pair'
+            }
+          </Form.Text>
+        </Form.Group>
+        <Form.Group className="mb-3" controlId="formTradingTokenAmount">
+          <Form.Label>Amount of {tradingFormState.tokenAsset?.symbol} to {tradingFormState.operation} for ETH</Form.Label>
+          <Form.Control value={tradingFormState.tokenAmount}
+              onChange={(e) => updateTradingFormState(e, 'tokenAmount')}
+              disabled={busy}
+              type="string"/>
+          <Form.Text className="text-muted">
+            {
+              tradingFormState.liquidityPair?
+                (
+                  tradingFormState.operation === 'buy'?
+                    `Maximum ether that will be sent: ${ ethers.utils.formatEther(tradingFormState.etherAmount) }` :
+                    `Minimum ether that will be received: ${ ethers.utils.formatEther(tradingFormState.etherAmount) }`
+                ) :
+                'Unable to trade, no such liquidity pair'
+            }
+          </Form.Text>
+        </Form.Group>
+        <Button variant="primary" type="submit" disabled={busy || !tradingFormState.liquidityPair}>
           Submit
         </Button>
       </Form>
