@@ -53,3 +53,26 @@ This command will write contract details into `.env.development.local` file, whi
 Configure MetaMask to connect to the network at `http://localhost:8545`.
 
 Note there are 20 test accounts with privates keys printed in the log when Harthat network starts. You will need to Account #0 to MetaMask or other compatible wallet. This account is the owner of the Uniswap factory, the WETH-TEST liquidity pool, and a balance of TEST tokens.
+
+## Deploying contracts to Ropsten testnet
+
+### Create Infura project
+
+You will need `PROJECT_ID` and `PROJECT_SECRET` values.
+
+### Create .env.local file
+
+```
+INFURA_PROJECT_ID=<<PROJECT_ID>>
+INFURA_PROJECT_SECRET=<<PROJECT_SECRET>
+ROPSTEN_DEPLOYMENT_ACCOUNT_PRIVATE_KEY=<<PRIVATE KEY OF THE DEPLOYMENT ACCOUNT>>
+WETH9_CONTRACT_ADDRESS=0xc778417E063141139Fce010982780140Aa0cD5Ab
+```
+
+### Run deployment scripts
+
+`npx hardhat run --network ropsten ./scripts/deploy-contract.js`
+
+### Update production environment config
+
+Don't forget to change `.env.production` to point at the newly deployed contracts.
