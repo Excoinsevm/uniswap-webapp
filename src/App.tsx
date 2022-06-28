@@ -181,7 +181,7 @@ function App() {
         /* liquidityTo */ selectedAccount,
         /* deadline (10 min) */ Math.floor( Date.now() / 1000) + 600,
         { /* amountETHDesired */ value: etherToAdd, gasLimit: 30000000 });
-      console.log("Adding liquidity transaction:", approveTx);
+      console.log("Adding liquidity transaction:", liquidityTx);
       await liquidityTx.wait();
     
     }
@@ -230,17 +230,25 @@ function App() {
       const tokenAmount = command.tokenAmount;
 
       if (command.operation === 'buy') {
-        // const amountInMax = etherToAdd.div(100).mul(105);
-        // const path = [ process.env.REACT_APP_WETH_CONTRACT, command.tokenAddress ];
+        const path = [ process.env.REACT_APP_WETH_CONTRACT, command.tokenAddress ];
 
-        // console.log("Preparing swapETHForExactTokens:", {
-        //   amountOut: tokenAmount.toString(),
-        //   amountInMax: amountInMax.toString(),
-        //   path
-        // });
+        console.log("Preparing swapETHForExactTokens:", {
+          amountOut: tokenAmount.toString(),
+          amountInMax: command.etherAmount.toString(),
+          path
+        });
+
+        const tradeTx = await uniswapRouterContract.connect(signer).swapETHForExactTokens(
+          /* amountOut */ tokenAmount,
+          /* path */ path,
+          /* to */ selectedAccount,
+          /* deadline (10 min) */ Math.floor( Date.now() / 1000) + 600,
+          { /* amountInMax */ value: command.etherAmount, gasLimit: 30000000 });
+
+        console.log("Executing transaction:", tradeTx);
+        await tradeTx.wait();
 
       } else if (command.operation === 'sell') {
-
         const path = [ command.tokenAddress, process.env.REACT_APP_WETH_CONTRACT ];
 
         console.log("Preparing swapExactTokensForETH:", {
@@ -254,7 +262,7 @@ function App() {
         console.log("Approval transaction:", approveTx);
         await approveTx.wait();
   
-        const liquidityTx = await uniswapRouterContract.connect(signer).swapExactTokensForETH(
+        const tradeTx = await uniswapRouterContract.connect(signer).swapExactTokensForETH(
           /* amountIn */ tokenAmount,
           /* amountOutMin */ command.etherAmount,
           /* path */ path,
@@ -262,8 +270,8 @@ function App() {
           /* deadline (10 min) */ Math.floor( Date.now() / 1000) + 600,
           { gasLimit: 30000000 });
 
-        console.log("Executing transaction:", approveTx);
-        await liquidityTx.wait();
+        console.log("Executing transaction:", tradeTx);
+        await tradeTx.wait();
       }
     }
 
