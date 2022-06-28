@@ -78,6 +78,8 @@ function App() {
     const ethBalance = await provider.getBalance(myAccount);
     setAccountEtherBalance(ethBalance);
 
+    console.log(`Connected to account ${myAccount} with current ETH balance of ${ethBalance.toString()}`);
+
     // automatically update account ETH balance
     provider.on('block', () => {
       provider.getBalance(myAccount).then((balance) => {
@@ -89,13 +91,15 @@ function App() {
     console.log('Bootstrap token contract addresses:', bootstrapTokenContractAddresses);
 
     // obtain all uniswap pairs and lookup their tokens
-    const knownPairsCount = await uniswapFactoryContract.allPairsLength();
-    const knownPairAddresses = await Promise.all(
+    const knownPairsCount = (await uniswapFactoryContract.allPairsLength()) as BigNumber;
+    const knownPairAddresses = knownPairsCount.isZero()? [] : await Promise.all(
       Array.from(Array(knownPairsCount).keys()) // 0 ... pairsCount - 1
         .map((index) => 
           uniswapFactoryContract.allPairs(index) as Promise<string>
         )
     );
+
+    console.log('Uniswap pairs known to the factory:', knownPairAddresses);
 
     const knownPairContracts = knownPairAddresses.map((pairAddress) =>
       new ethers.Contract(pairAddress, uniswapV2Pair.abi, provider));
