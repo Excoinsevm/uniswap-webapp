@@ -79,10 +79,11 @@ function App() {
     setAccountEtherBalance(ethBalance);
 
     // automatically update account ETH balance
-    // provider.on(myAccount, (balance) => {
-    //   console.log(`Account ETH balance updated to ${balance}`)
-    //   setAccountEtherBalance(balance);
-    // });
+    provider.on('block', () => {
+      provider.getBalance(myAccount).then((balance) => {
+        setAccountEtherBalance((oldBalance) => balance);
+      });
+    });
 
     const bootstrapTokenContractAddresses = process.env.REACT_APP_BOOTSTRAP_ERC20_CONTRACTS.split(',');
     console.log('Bootstrap token contract addresses:', bootstrapTokenContractAddresses);
@@ -423,7 +424,7 @@ const TokensAndBalancesForm: FC<ITokensAndBalancesProps> = ({busy, etherBalance,
     <Container>
       <p>Uniswap V2 Factory contract @ { process.env.REACT_APP_FACTORY_CONTRACT }</p>
       <p>Uniswap V2 Router contract @ { process.env.REACT_APP_ROUTER_CONTRACT }</p>
-      <p>Amount of ETH in your wallet: { ethers.utils.formatEther(etherBalance) }</p>
+      <p>Amount of <b>ETH</b> in your wallet: { ethers.utils.formatEther(etherBalance) }</p>
       <p>Token balances in your wallet:</p>
       <ul>
       {
