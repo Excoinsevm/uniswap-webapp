@@ -33,7 +33,7 @@ interface IWalletAsset {
   address: string,
   symbol: string,
   decimals: number,
-  factor: BigNumber,
+  factor: BigNumber, // decimals ** 10
   balance: BigNumber
 }
 
@@ -60,7 +60,7 @@ function App() {
   const [ busy, setBusy ] = useState(false);
 
   const [ selectedAccount, setSelectedAccount ] = useState("");
-  const [ accountBalance, setAccountBalance ] = useState("");
+  const [ accounEtherBalance, setAccountEtherBalance ] = useState<BigNumber>(constants.Zero);
 
   const [ walletAssets, setWalletAssets ] = useState(Immutable.Map<string, IWalletAsset>());
   const [ liquidityPairs, setLiquidityPairs ] = useState(Immutable.Map<string, ILiquidityPair>());
@@ -71,7 +71,7 @@ function App() {
     const myAccount = accounts[0];
     setSelectedAccount(myAccount);
     const ethBalance = await provider.getBalance(myAccount);
-    setAccountBalance(ethers.utils.formatEther(ethBalance));
+    setAccountEtherBalance(ethBalance);
 
     const bootstrapTokenContractAddresses = process.env.REACT_APP_BOOTSTRAP_ERC20_CONTRACTS.split(',');
     console.log('Bootstrap token contract addresses:', bootstrapTokenContractAddresses);
@@ -226,6 +226,7 @@ function App() {
         </Container>
       </Navbar>
       <WorkingArea connected={connected} busy={busy}
+        etherBalance={accounEtherBalance}
         walletAssets={walletAssets} handleAddToken={handleAddToken} 
         liquidityPairs={liquidityPairs} handleAddLiquidity={handleAddLiquidity}/>
     </Container>
@@ -248,13 +249,14 @@ const UserWelcome: FC<IUserWelcomeProps> = ({connected, account, onConnect}) => 
 
 interface IWorkingAreaProps extends ITokensAndBalancesProps {
   connected: boolean;
+  etherBalance: BigNumber;
   walletAssets: Immutable.Map<string, IWalletAsset>,
   handleAddToken: (address: string) => void,
   liquidityPairs: Immutable.Map<string, ILiquidityPair>,
   handleAddLiquidity: (command: IAddLiquidityCommand) => void
 }
 
-const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, walletAssets, handleAddToken, liquidityPairs, handleAddLiquidity}) => {
+const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, etherBalance, walletAssets, handleAddToken, liquidityPairs, handleAddLiquidity}) => {
   if (!connected) {
     return <p>Not connect to a provider</p>
   }
@@ -263,13 +265,16 @@ const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, walletAssets, hand
       <Accordion.Item eventKey="tokens">
         <Accordion.Header>Tokens and balances</Accordion.Header>
         <Accordion.Body>
-          <TokensAndBalancesForm busy={busy} walletAssets={walletAssets} handleAddToken={handleAddToken} />
+          <TokensAndBalancesForm busy={busy} etherBalance={etherBalance}
+            walletAssets={walletAssets.filterNot((asset) => asset.symbol === 'WETH')}
+            handleAddToken={handleAddToken} />
         </Accordion.Body>
       </Accordion.Item>
       <Accordion.Item eventKey="liquidity">
         <Accordion.Header>Liquidity</Accordion.Header>
         <Accordion.Body>
-          <LiquidityForm busy={busy} walletAssets={walletAssets.filterNot((asset) => asset.symbol === 'WETH')}
+          <LiquidityForm busy={busy}
+            walletAssets={walletAssets.filterNot((asset) => asset.symbol === 'WETH')}
             liquidityPairs={liquidityPairs} handleAddLiquidity={handleAddLiquidity} />
         </Accordion.Body>
       </Accordion.Item>
@@ -279,6 +284,7 @@ const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, walletAssets, hand
 
 interface ITokensAndBalancesProps {
   busy: boolean;
+  etherBalance: BigNumber;
   walletAssets: Immutable.Map<string, IWalletAsset>,
   handleAddToken: (address: string) => void
 }
@@ -287,7 +293,7 @@ interface IAddTokenFormState {
   contractAddress: string,
 }
 
-const TokensAndBalancesForm: FC<ITokensAndBalancesProps> = ({busy, walletAssets, handleAddToken}) => {
+const TokensAndBalancesForm: FC<ITokensAndBalancesProps> = ({busy, etherBalance, walletAssets, handleAddToken}) => {
   const [ tokenAddressFormState, setTokenAddressFormState ] = useState<IAddTokenFormState>({ contractAddress: "" });
 
   function updateTokenAddressFormState(event: React.SyntheticEvent, property: string) {
@@ -310,6 +316,7 @@ const TokensAndBalancesForm: FC<ITokensAndBalancesProps> = ({busy, walletAssets,
     <Container>
       <p>Uniswap V2 Factory contract @ { process.env.REACT_APP_FACTORY_CONTRACT }</p>
       <p>Uniswap V2 Router contract @ { process.env.REACT_APP_ROUTER_CONTRACT }</p>
+      <p>Amount of ETH in your wallet: { ethers.utils.formatEther(etherBalance) }</p>
       <p>Token balances in your wallet:</p>
       <ul>
       {
