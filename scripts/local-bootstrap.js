@@ -33,15 +33,22 @@ async function main() {
 
   console.log("UniswapV2Router deployed to: ", uniswapV2RouterContract.address);
 
-  const testTokenFactory = await hre.ethers.getContractFactory("TestERC20");
-  const testTokenContract = await testTokenFactory.deploy(BigNumber.from(1000).mul(constants.WeiPerEther));
+  const test1TokenFactory = await hre.ethers.getContractFactory("Test1ERC20");
+  const test1TokenContract = await test1TokenFactory.deploy(BigNumber.from(1000).mul(constants.WeiPerEther));
 
-  await testTokenContract.deployed();
+  await test1TokenContract.deployed();
 
-  console.log("TestERC20 deployed to: ", testTokenContract.address);
+  console.log("Test1ERC20 deployed to: ", test1TokenContract.address);
 
-  const symbol = await testTokenContract.symbol();
-  const balanceRaw = await testTokenContract.balanceOf(deployingSigner.address);
+  const test2TokenFactory = await hre.ethers.getContractFactory("Test2ERC20");
+  const test2TokenContract = await test2TokenFactory.deploy(BigNumber.from(1000).mul(constants.WeiPerEther));
+
+  await test2TokenContract.deployed();
+
+  console.log("Test2ERC20 deployed to: ", test2TokenContract.address);
+
+  const symbol = await test1TokenContract.symbol();
+  const balanceRaw = await test1TokenContract.balanceOf(deployingSigner.address);
   const balance = utils.formatUnits(BigNumber.from(balanceRaw), 18);
   console.log(`Address ${deployingSigner.address} has the balance of ${balance} ${symbol}`);
 
@@ -50,17 +57,17 @@ async function main() {
     `REACT_APP_FACTORY_CONTRACT=${ uniswapV2FactoryContract.address }\n`,
     `REACT_APP_ROUTER_CONTRACT=${ uniswapV2RouterContract.address }\n`,
     `REACT_APP_WETH_CONTRACT=${ weth9Contract.address }\n`,
-    `REACT_APP_BOOTSTRAP_ERC20_CONTRACTS=${ testTokenContract.address }\n`,
+    `REACT_APP_BOOTSTRAP_ERC20_CONTRACTS=${ test1TokenContract.address },${ test2TokenContract.address }\n`,
   ]
   await fs.writeFile('.env.development.local', env);
 
   // provide the initial liquidity to Uniswap protocol
-  const approveTx = await testTokenContract.approve(uniswapV2RouterContract.address, balanceRaw);
+  const approveTx = await test1TokenContract.approve(uniswapV2RouterContract.address, balanceRaw);
   await approveTx.wait();
   console.log(`Gave router the allowance to use full balance of ${symbol}`);
 
   const liquidityTx = await uniswapV2RouterContract.addLiquidityETH(
-    /* token */ testTokenContract.address,
+    /* token */ test1TokenContract.address,
     /* amountTokenDesired */ BigNumber.from(500).mul(constants.WeiPerEther),
     /* amountTokenMin */ BigNumber.from(500).mul(constants.WeiPerEther),
     /* amountETHMin */ BigNumber.from(500).mul(constants.WeiPerEther),

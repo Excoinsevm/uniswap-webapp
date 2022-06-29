@@ -113,13 +113,14 @@ function App() {
     console.log('Bootstrap token contract addresses:', bootstrapTokenContractAddresses);
 
     // obtain all uniswap pairs and lookup their tokens
-    const knownPairsCount = (await uniswapFactoryContract.allPairsLength()) as BigNumber;
-    const knownPairAddresses = knownPairsCount.isZero()? [] : await Promise.all(
+    const knownPairsCountBN = (await uniswapFactoryContract.allPairsLength()) as BigNumber;
+    const knownPairsCount = knownPairsCountBN.toNumber();
+    const knownPairAddresses = (knownPairsCount > 0)? await Promise.all(
       Array.from(Array(knownPairsCount).keys()) // 0 ... pairsCount - 1
         .map((index) => 
           uniswapFactoryContract.allPairs(index) as Promise<string>
         )
-    );
+    ) : [];
 
     console.log('Uniswap pairs known to the factory:', knownPairAddresses);
 
