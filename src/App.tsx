@@ -574,8 +574,8 @@ interface ILiquidityProps {
 interface ILiquidityFormState {
   tokenAddress: string,
   tokenAsset?: IWalletAsset,
-  tokenToAdd: number,
-  etherToAdd: number
+  tokenToAdd: string,
+  etherToAdd: string
 }
 
 const LiquidityForm: FC<ILiquidityProps> = ({busy, liquidityPairs, walletAssets, handleAddLiquidity}) => {
@@ -583,8 +583,8 @@ const LiquidityForm: FC<ILiquidityProps> = ({busy, liquidityPairs, walletAssets,
   const [ liquidityFormState, setLiquidityFormState ] = useState<ILiquidityFormState>({
     tokenAddress: firstToken?.address,
     tokenAsset: firstToken,
-    tokenToAdd: 0,
-    etherToAdd: 0
+    tokenToAdd: "0",
+    etherToAdd: "0"
   } as ILiquidityFormState);
 
   function updateLiquidityFormState(event: React.SyntheticEvent, property: string) {
@@ -609,8 +609,8 @@ const LiquidityForm: FC<ILiquidityProps> = ({busy, liquidityPairs, walletAssets,
     if (liquidityFormState.tokenAsset !== undefined) {
       handleAddLiquidity({
         tokenAddress: liquidityFormState.tokenAddress,
-        tokenToAdd: BigNumber.from(liquidityFormState.tokenToAdd).mul(liquidityFormState.tokenAsset.factor),
-        etherToAdd: BigNumber.from(liquidityFormState.etherToAdd).mul(constants.WeiPerEther)
+        tokenToAdd: ethers.utils.parseUnits(liquidityFormState.tokenToAdd, liquidityFormState.tokenAsset.decimals),
+        etherToAdd: ethers.utils.parseEther(liquidityFormState.etherToAdd)
       } as IAddLiquidityCommand);
     }
   }
@@ -678,7 +678,7 @@ interface ITradingFormState {
   tokenAsset?: IWalletAsset;
   liquidityPair?: ILiquidityPair;
   tokenAddress: string;
-  tokenAmount: number;
+  tokenAmount: string;
   etherAmount: BigNumber;
 }
 
@@ -688,7 +688,7 @@ const TradingForm: FC<ITradingFormProps> = ({busy, walletAssets, liquidityPairs,
     tokenAddress: firstToken?.address,
     tokenAsset: firstToken,
     operation: 'buy',
-    tokenAmount: 0,
+    tokenAmount: "0",
     etherAmount: constants.Zero,
     liquidityPair: findLiquidityPair(firstToken?.address, liquidityPairs)
   } as ITradingFormState);
@@ -714,7 +714,7 @@ const TradingForm: FC<ITradingFormProps> = ({busy, walletAssets, liquidityPairs,
       state.liquidityPair = findLiquidityPair(state.tokenAddress, liquidityPairs);
 
       if (state.liquidityPair !== undefined && state.tokenAsset !== undefined) {
-        const tokenAmount = BigNumber.from(state.tokenAmount).mul(state.tokenAsset.factor);
+        const tokenAmount = ethers.utils.parseUnits(state.tokenAmount, state.tokenAsset.decimals);
         const tokenPrice = state.liquidityPair.tokenPriceInEther;
         const etherEstimate = BigNumber.from(tokenPrice.multiply(tokenAmount.toBigInt()).toFixed(0));
 
