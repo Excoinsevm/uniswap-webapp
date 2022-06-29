@@ -273,7 +273,7 @@ function App() {
     const token1Reserve = reserves[1] as BigNumber;
 
     const reserveRatio = new Fraction(token0Reserve.toBigInt(), token1Reserve.toBigInt());
-    const tokenPriceInEther = (token0Address === process.env.REACT_APP_WETH_CONTRACT)? reserveRatio.invert(): reserveRatio;
+    const tokenPriceInEther = (token0Address === process.env.REACT_APP_WETH_CONTRACT)? reserveRatio: reserveRatio.invert();
 
     console.log({token0Symbol, token1Symbol, reserveRatio: reserveRatio.toSignificant(3), tokenPriceInEther: tokenPriceInEther.toSignificant(3)});
 
