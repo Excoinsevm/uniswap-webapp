@@ -41,6 +41,7 @@ interface IWalletAsset {
 
 interface ILiquidityPair {
   name: string,
+  address: string,
   token0Address: string,
   token1Address: string,
   token0Symbol: string,
@@ -140,7 +141,7 @@ function App() {
     assetsMap.valueSeq().forEach((asset) => updateWalletAsset(asset, myAccount));
 
     const pairs = await Promise.all(knownPairContracts.map(async (contract) => describeLiquidityPair(contract, myAccount, assetsMap)));
-    pairs.forEach(putLiquidityPair);
+    pairs.forEach((pair) => updateLiquidityPair(pair, myAccount, assetsMap));
 
     // make operation tabs visible
     setConnected(true);
@@ -198,9 +199,23 @@ function App() {
     } as IWalletAsset;
   }
 
-  function putLiquidityPair(pair: ILiquidityPair) {
+  function updateLiquidityPair(pair: ILiquidityPair, myAddress: string, assets: Immutable.Map<string, IWalletAsset>) {
     console.log("Adding liquidity pair", pair);
-    setLiquidityPairs((prev) => prev.set(pair.name, pair));
+    setLiquidityPairs((prev) => {
+      const pairContract = new ethers.Contract(pair.address, uniswapV2Pair.abi, provider);
+
+      // listen to transfers from and to the current address
+      const syncFilter = pairContract.filters.Sync();
+      provider.on(syncFilter, async (log) => {
+        // ignore past events
+        if (log.blockNumber === provider.blockNumber) {
+          const updatedPair = await describeLiquidityPair(pairContract, myAddress, assets);
+          updateLiquidityPair(updatedPair, myAddress, assets);
+        }
+      });
+
+      return prev.set(pair.name, pair)
+    });
   }
 
   async function handleAddLiquidity(command: IAddLiquidityCommand) {
@@ -264,6 +279,7 @@ function App() {
 
     return {
       name: `${token0Symbol}-${token1Symbol}`,
+      address: contract.address,
       token0Address,
       token1Address,
       token0Symbol,
