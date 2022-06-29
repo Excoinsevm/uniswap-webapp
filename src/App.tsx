@@ -96,8 +96,13 @@ function App() {
 
     // automatically update account ETH balance
     provider.on('block', () => {
-      provider.getBalance(myAccount).then((balance) => {
-        setAccountEtherBalance((oldBalance) => balance);
+      provider.getBalance(myAccount).then((newBalance) => {
+        setAccountEtherBalance((oldBalance) => {
+          if (!oldBalance.eq(newBalance)) {
+            console.log(`ETH balance change detected from  ${ethers.utils.formatEther(oldBalance)} to ${ethers.utils.formatEther(newBalance)}`)
+          }
+          return newBalance;
+        });
       });
     });
 
@@ -132,7 +137,7 @@ function App() {
 
     const assets = await Promise.all(allTokenContracts.map(async (contract) => describeWalletAsset(contract, myAccount)));
     const assetsMap = Immutable.Map(assets.map((asset) => [ asset.address, asset ]));
-    setWalletAssets(assetsMap);
+    assetsMap.valueSeq().forEach((asset) => updateWalletAsset(asset, myAccount));
 
     const pairs = await Promise.all(knownPairContracts.map(async (contract) => describeLiquidityPair(contract, myAccount, assetsMap)));
     pairs.forEach(putLiquidityPair);
@@ -141,12 +146,32 @@ function App() {
     setConnected(true);
   }
 
-  function addWalletAsset(asset: IWalletAsset) {
+  function createTransferEventListener(asset: IWalletAsset, assetContract: ethers.Contract, myAccount: string) {
+    return async (log: ethers.providers.Log) => {
+      // ignore past events
+      if (provider.blockNumber === log.blockNumber) {
+        const newBalance = await assetContract.balanceOf(myAccount);
+        console.log(`Asset balance of ${asset.symbol} has changed`, ethers.utils.formatUnits(newBalance, asset.decimals));
+
+        const newAsset = { ...asset, balance: newBalance };
+        updateWalletAsset(newAsset, myAccount);
+      }
+    };
+  }
+
+  function updateWalletAsset(asset: IWalletAsset, myAccount: string) {
     setWalletAssets((prev) => {
       if (!prev.has(asset.address)) {
-        return prev.set(asset.address, asset);
+        const assetContract = new ethers.Contract(asset.address, erc20.abi, provider);
+
+        // listen to transfers from and to the current address
+        const transferFromFilter = assetContract.filters.Transfer(myAccount, null, null);
+        const transferToFilter = assetContract.filters.Transfer(null, myAccount, null);
+        const listener = createTransferEventListener(asset, assetContract, myAccount);
+        provider.on(transferFromFilter, listener);
+        provider.on(transferToFilter, listener);
       }
-      return prev;
+      return prev.set(asset.address, asset);
     });
   }
 
@@ -157,7 +182,7 @@ function App() {
     const asset = await describeWalletAsset(tokenContract, selectedAccount);
     console.log("Adding new ERC20 asset: ", asset);
 
-    addWalletAsset(asset);
+    updateWalletAsset(asset, selectedAccount);
     setBusy(false);
   }
 
