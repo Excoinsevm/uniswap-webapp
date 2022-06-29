@@ -1,5 +1,6 @@
 require("@nomiclabs/hardhat-ethers");
 
+require("dotenv").config({ path: '.env.production' });
 require("dotenv").config({ path: '.env.local' });
 
 /**
