@@ -3,7 +3,7 @@ import 'bootstrap/dist/css/bootstrap.css';
 
 import Immutable from 'immutable';
 
-import { Navbar, Container, Accordion, Button, Form, Table } from 'react-bootstrap'
+import { Navbar, Container, Accordion, Button, Form, Table, Card, Row, Col, Stack, ListGroup } from 'react-bootstrap'
 
 import { ethers, BigNumber, constants } from "ethers";
 import React, { useState, FC } from 'react';
@@ -323,11 +323,14 @@ function App() {
           </Navbar.Collapse>
         </Container>
       </Navbar>
-      <WorkingArea connected={connected} busy={busy}
-        etherBalance={accounEtherBalance}
-        walletAssets={walletAssets} handleAddToken={handleAddToken} 
-        liquidityPairs={liquidityPairs} handleAddLiquidity={handleAddLiquidity}
-        handleTrade={handleTrade} />
+      <Container>
+        <br/>
+        <WorkingArea connected={connected} busy={busy}
+          etherBalance={accounEtherBalance}
+          walletAssets={walletAssets} handleAddToken={handleAddToken} 
+          liquidityPairs={liquidityPairs} handleAddLiquidity={handleAddLiquidity}
+          handleTrade={handleTrade} />
+      </Container>
     </Container>
   );
 }
@@ -371,20 +374,66 @@ interface IWorkingAreaProps extends ITokensAndBalancesProps {
 
 const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, etherBalance, walletAssets, handleAddToken, liquidityPairs, handleAddLiquidity, handleTrade}) => {
   if (!connected) {
-    return <p>Not connect to a provider</p>
+    return <p>Not connected to a provider</p>
   }
+
+  const assets = [{ symbol: 'ETH', balance: ethers.utils.formatEther(etherBalance) }].concat(
+    walletAssets.valueSeq().map((asset) => 
+      ({ symbol: asset.symbol, balance: ethers.utils.formatUnits(asset.balance, asset.decimals) })
+    ).toArray());
+
   return (
-    <Accordion defaultActiveKey="tokens">
-      <Accordion.Item eventKey="tokens">
-        <Accordion.Header>Tokens and balances</Accordion.Header>
-        <Accordion.Body>
-          <TokensAndBalancesForm busy={busy} etherBalance={etherBalance}
-            walletAssets={walletAssets.filterNot((asset) => asset.symbol === 'WETH')}
-            handleAddToken={handleAddToken} />
-        </Accordion.Body>
-      </Accordion.Item>
+  <Stack gap={3}>
+    <Row>
+      <Col xs={8}>
+        <Card>
+          <Card.Header>Liquidity pools</Card.Header>
+          <Card.Body>
+            <Table>
+                <thead>
+                  <tr>
+                    <th>Pair</th>
+                    <th>Reserve 0</th>
+                    <th>Reserve 1</th>
+                    <th>Ratio</th>
+                    <th>Liquidity tokens owned</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {
+                    liquidityPairs.valueSeq().map((pair) => 
+                      <tr key={pair.name}>
+                        <td>{ pair.name }</td>
+                        <td>{ ethers.utils.formatUnits(pair.token0Reserve, pair.token0Decimals) } { pair.token0Symbol }</td>
+                        <td>{ ethers.utils.formatUnits(pair.token1Reserve, pair.token1Decimals) } { pair.token1Symbol }</td>
+                        <td>{ pair.reserveRatio.toSignificant(3) }</td>
+                        <td>{ ethers.utils.formatUnits(pair.liquidityTokenOwned) }</td>
+                      </tr>
+                    )
+                  }
+                </tbody>
+              </Table>
+          </Card.Body>
+        </Card>
+      </Col>
+      <Col>
+        <Card>
+          <Card.Header>Your wallet</Card.Header>
+          <ListGroup>
+          {
+            assets.map((asset) =>
+              <ListGroup.Item key={asset.symbol}>
+                <b>{ asset.symbol }</b>{ ': ' + asset.balance }
+              </ListGroup.Item>
+            )
+          }
+          </ListGroup>
+        </Card>
+      </Col>
+    </Row>
+    <Accordion defaultActiveKey="liquidity">
       <Accordion.Item eventKey="liquidity">
-        <Accordion.Header>Liquidity</Accordion.Header>
+        <Accordion.Header>Add liquidity</Accordion.Header>
         <Accordion.Body>
           <LiquidityForm busy={busy}
             walletAssets={walletAssets.filterNot((asset) => asset.symbol === 'WETH')}
@@ -399,7 +448,24 @@ const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, etherBalance, wall
             liquidityPairs={liquidityPairs} handleTrade={handleTrade} />
         </Accordion.Body>
       </Accordion.Item>
+      <Accordion.Item eventKey="tokens">
+        <Accordion.Header>Token contracts</Accordion.Header>
+        <Accordion.Body>
+          <TokensAndBalancesForm busy={busy} etherBalance={etherBalance}
+            walletAssets={walletAssets.filterNot((asset) => asset.symbol === 'WETH')}
+            handleAddToken={handleAddToken} />
+        </Accordion.Body>
+      </Accordion.Item>
+      <Accordion.Item eventKey="info">
+        <Accordion.Header>Configuration</Accordion.Header>
+        <Accordion.Body>
+          <p>Uniswap V2 Factory contract @ { process.env.REACT_APP_FACTORY_CONTRACT }</p>
+          <p>Uniswap V2 Router contract @ { process.env.REACT_APP_ROUTER_CONTRACT }</p>
+          <p>WETH contract @ { process.env.REACT_APP_WETH_CONTRACT }</p>
+        </Accordion.Body>
+      </Accordion.Item>
     </Accordion>
+  </Stack>
   );
 }
 
@@ -441,20 +507,7 @@ const TokensAndBalancesForm: FC<ITokensAndBalancesProps> = ({busy, etherBalance,
 
   return (
     <Container>
-      <p>Uniswap V2 Factory contract @ { process.env.REACT_APP_FACTORY_CONTRACT }</p>
-      <p>Uniswap V2 Router contract @ { process.env.REACT_APP_ROUTER_CONTRACT }</p>
-      <p>Amount of <b>ETH</b> in your wallet: { ethers.utils.formatEther(etherBalance) }</p>
-      <p>Token balances in your wallet:</p>
-      <ul>
-      {
-        walletAssets.valueSeq().map((asset) =>
-          <li key={asset.symbol}>
-            <b>{ asset.symbol }</b>{ ': ' + ethers.utils.formatUnits(asset.balance, asset.decimals) }
-          </li>
-        )
-      }
-      </ul>
-      <p>The above shows balances of all tokens for which there is a liquidity pool, plus a few standard ones.</p>
+      <p>The wallet widget above only shows balances of all tokens for which there is a liquidity pool, plus a few standard ones.</p>
       <p>Use this form to add more ERC-20 token contracts, which could be used in other operations:</p>
       <Form key="addToken" onSubmit={handleAddTokenSubmit}>
         <Form.Group className="mb-3" controlId="formContractAddress">
@@ -539,32 +592,7 @@ const LiquidityForm: FC<ILiquidityProps> = ({busy, liquidityPairs, walletAssets,
 
   return (
     <Container>
-      <p>Liquidity pool status</p>
-      <Table>
-        <thead>
-          <tr>
-            <th>Pair</th>
-            <th>Token 0 reserve</th>
-            <th>Token 1 reserve</th>
-            <th>Mid-price</th>
-            <th>Liquidity tokens owned</th>
-          </tr>
-        </thead>
-        <tbody>
-          {
-            liquidityPairs.valueSeq().map((pair) => 
-              <tr key={pair.name}>
-                <td>{ pair.name }</td>
-                <td>{ ethers.utils.formatUnits(pair.token0Reserve, pair.token0Decimals) } { pair.token0Symbol }</td>
-                <td>{ ethers.utils.formatUnits(pair.token1Reserve, pair.token1Decimals) } { pair.token1Symbol }</td>
-                <td>{ pair.reserveRatio.toSignificant(3) }</td>
-                <td>{ ethers.utils.formatUnits(pair.liquidityTokenOwned, 18) }</td>
-              </tr>
-            )
-          }
-        </tbody>
-      </Table>
-      <p>Add liquidity. Note this form only supports ETH-asset liquidity and assumes slippage tolerance of 5%:</p>
+      <p>Note this form only supports ETH-asset liquidity and assumes slippage tolerance of 5%:</p>
       <Form onSubmit={handleAddLiquiditySubmit}>
         <Form.Group className="mb-3" controlId="formLiquidityToken">
           <Form.Label>Select a token</Form.Label>
