@@ -761,7 +761,7 @@ const TradingForm: FC<ITradingFormProps> = ({busy, walletAssets, liquidityPairs,
       handleTrade({
         operation: tradingFormState.operation,
         tokenAddress: tradingFormState.tokenAddress,
-        tokenAmount: BigNumber.from(tradingFormState.tokenAmount).mul(tradingFormState.tokenAsset.factor),
+        tokenAmount: ethers.utils.parseUnits(tradingFormState.tokenAmount, tradingFormState.tokenAsset.decimals),
         etherAmount: tradingFormState.etherAmount
       } as ITradeCommand);
     }
