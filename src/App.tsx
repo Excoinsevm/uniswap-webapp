@@ -54,8 +54,9 @@ interface ILiquidityPair {
   tokenPriceInEther: Fraction
 }
 
+const provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+
 function App() {
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
   const uniswapFactoryContract = new ethers.Contract(process.env.REACT_APP_FACTORY_CONTRACT, uniswapV2Factory.abi, provider);
   const uniswapRouterContract = new ethers.Contract(process.env.REACT_APP_ROUTER_CONTRACT, uniswapV2Router.abi, provider);
 
@@ -64,6 +65,7 @@ function App() {
   // forms are disabled (busy) when waiting for the current transaction to get confirmed
   const [ busy, setBusy ] = useState(false);
 
+  const [ networkInfo, setNetworkInfo ] = useState<ethers.providers.Network>({} as ethers.providers.Network);
   const [ selectedAccount, setSelectedAccount ] = useState("");
   const [ accounEtherBalance, setAccountEtherBalance ] = useState<BigNumber>(constants.Zero);
 
@@ -79,6 +81,18 @@ function App() {
     setAccountEtherBalance(ethBalance);
 
     console.log(`Connected to account ${myAccount} with current ETH balance of ${ethBalance.toString()}`);
+
+    const network = await provider.getNetwork();
+    console.log('Connected to network:', network);
+    setNetworkInfo(network);
+
+    // reload page on network change
+    provider.on("network", (newNetwork, oldNetwork) => {
+      if (oldNetwork) {
+        console.log('Network change detected, reloading');
+        window.location.reload();
+      }
+    })
 
     // automatically update account ETH balance
     provider.on('block', () => {
@@ -304,7 +318,7 @@ function App() {
           <Navbar.Brand>Forked Uniswap v2 by <a href="https://github.com/lobanov/uniswap-webapp">@lobanov</a></Navbar.Brand>
           <Navbar.Collapse className="justify-content-end">
             <Navbar.Text>
-              <UserWelcome connected={connected} account={selectedAccount} onConnect={connectToMetaMask} />
+              <UserWelcome connected={connected} network={networkInfo} account={selectedAccount} onConnect={connectToMetaMask} />
             </Navbar.Text>
           </Navbar.Collapse>
         </Container>
@@ -327,14 +341,15 @@ function App() {
 interface IUserWelcomeProps {
   connected: boolean,
   account: string,
+  network: ethers.providers.Network,
   onConnect: () => void
 }
 
-const UserWelcome: FC<IUserWelcomeProps> = ({connected, account, onConnect}) => {
+const UserWelcome: FC<IUserWelcomeProps> = ({connected, account, network, onConnect}) => {
   if (!connected) {
-    return <Button onClick={() => onConnect()}>Connect to MetaMask</Button>
+    return <Button onClick={() => onConnect()}>Connect to Wallet</Button>
   } else {
-    return <Container>Welcome, {account}</Container>
+    return <Container>Welcome, {account} ({network.name} #{network.chainId})</Container>
   }
 }
 
