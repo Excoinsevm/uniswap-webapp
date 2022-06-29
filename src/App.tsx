@@ -23,6 +23,7 @@ declare global {
       REACT_APP_ROUTER_CONTRACT: string;
       REACT_APP_WETH_CONTRACT: string;
       REACT_APP_BOOTSTRAP_ERC20_CONTRACTS: string;
+      REACT_APP_TX_OVERRIDES?: string;
     }
   }
   
@@ -56,11 +57,12 @@ interface ILiquidityPair {
 }
 
 const provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+const uniswapFactoryContract = new ethers.Contract(process.env.REACT_APP_FACTORY_CONTRACT, uniswapV2Factory.abi, provider);
+const uniswapRouterContract = new ethers.Contract(process.env.REACT_APP_ROUTER_CONTRACT, uniswapV2Router.abi, provider);
+const txOverrides = (typeof process.env.REACT_APP_TX_OVERRIDES === 'undefined')? {} : JSON.parse(process.env.REACT_APP_TX_OVERRIDES);
 
 function App() {
-  const uniswapFactoryContract = new ethers.Contract(process.env.REACT_APP_FACTORY_CONTRACT, uniswapV2Factory.abi, provider);
-  const uniswapRouterContract = new ethers.Contract(process.env.REACT_APP_ROUTER_CONTRACT, uniswapV2Router.abi, provider);
-
+  
   // operation tabs are not visible unless connected to the wallet
   const [ connected, setConnected ] = useState(false);
   // forms are disabled (busy) when waiting for the current transaction to get confirmed
@@ -248,7 +250,7 @@ function App() {
         /* amountETHMin */ etherToAddMin,
         /* liquidityTo */ selectedAccount,
         /* deadline (10 min) */ Math.floor( Date.now() / 1000) + 600,
-        { /* amountETHDesired */ value: etherToAdd, gasLimit: 30000000 });
+        { ...txOverrides, /* amountETHDesired */ value: etherToAdd });
       console.log("Adding liquidity transaction:", liquidityTx);
       await liquidityTx.wait();
     
@@ -317,7 +319,7 @@ function App() {
           /* path */ path,
           /* to */ selectedAccount,
           /* deadline (10 min) */ Math.floor( Date.now() / 1000) + 600,
-          { /* amountInMax */ value: command.etherAmount, gasLimit: 30000000 });
+          { ...txOverrides, /* amountInMax */ value: command.etherAmount });
 
         console.log("Executing transaction:", tradeTx);
         await tradeTx.wait();
