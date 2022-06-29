@@ -730,7 +730,10 @@ const TradingForm: FC<ITradingFormProps> = ({busy, walletAssets, liquidityPairs,
       state.liquidityPair = findLiquidityPair(state.tokenAddress, liquidityPairs);
 
       if (state.liquidityPair !== undefined && state.tokenAsset !== undefined) {
-        const tokenAmount = ethers.utils.parseUnits(state.tokenAmount, state.tokenAsset.decimals);
+        // avoid failing over on empty value
+        const tokenAmountString = state.tokenAmount.length > 0 ? state.tokenAmount : "0";
+
+        const tokenAmount = ethers.utils.parseUnits(tokenAmountString, state.tokenAsset.decimals);
         const tokenPrice = state.liquidityPair.tokenPriceInEther;
         const etherEstimate = BigNumber.from(tokenPrice.multiply(tokenAmount.toBigInt()).toFixed(0));
 
