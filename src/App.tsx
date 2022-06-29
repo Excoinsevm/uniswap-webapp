@@ -418,9 +418,9 @@ const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, etherBalance, wall
     return <p>Not connected to a provider</p>
   }
 
-  const assets = [{ symbol: 'ETH', balance: ethers.utils.formatEther(etherBalance) }].concat(
+  const assets = [{ symbol: 'ETH', display: <BigNumberDisplay value={etherBalance} /> }].concat(
     walletAssets.valueSeq().map((asset) => 
-      ({ symbol: asset.symbol, balance: ethers.utils.formatUnits(asset.balance, asset.decimals) })
+      ({ symbol: asset.symbol, display: <BigNumberDisplay value={asset.balance} decimals={asset.decimals} /> })
     ).toArray());
 
   return (
@@ -445,10 +445,10 @@ const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, etherBalance, wall
                     liquidityPairs.valueSeq().map((pair) => 
                       <tr key={pair.name}>
                         <td>{ pair.name }</td>
-                        <td>{ ethers.utils.formatUnits(pair.token0Reserve, pair.token0Decimals) } { pair.token0Symbol }</td>
-                        <td>{ ethers.utils.formatUnits(pair.token1Reserve, pair.token1Decimals) } { pair.token1Symbol }</td>
+                        <td><BigNumberDisplay value={pair.token0Reserve} decimals={pair.token0Decimals} /></td>
+                        <td><BigNumberDisplay value={pair.token1Reserve} decimals={pair.token1Decimals} /></td>
                         <td>{ pair.reserveRatio.toSignificant(3) }</td>
-                        <td>{ ethers.utils.formatUnits(pair.liquidityTokenOwned) }</td>
+                        <td><BigNumberDisplay value={pair.liquidityTokenOwned} /></td>
                       </tr>
                     )
                   }
@@ -464,7 +464,7 @@ const WorkingArea: FC<IWorkingAreaProps> = ({connected, busy, etherBalance, wall
           {
             assets.map((asset) =>
               <ListGroup.Item key={asset.symbol}>
-                <b>{ asset.symbol }</b>{ ': ' + asset.balance }
+                <b>{ asset.symbol }</b>{ ': '}{ asset.display }
               </ListGroup.Item>
             )
           }
@@ -807,8 +807,8 @@ const TradingForm: FC<ITradingFormProps> = ({busy, walletAssets, liquidityPairs,
               tradingFormState.liquidityPair?
                 (
                   tradingFormState.operation === 'buy'?
-                    `Maximum ether that will be sent: ${ ethers.utils.formatEther(tradingFormState.etherAmount) }` :
-                    `Minimum ether that will be received: ${ ethers.utils.formatEther(tradingFormState.etherAmount) }`
+                    <span>Maximum ether that will be sent: <BigNumberDisplay value={tradingFormState.etherAmount} /></span> :
+                    <span>Maximum ether that will be received: <BigNumberDisplay value={tradingFormState.etherAmount} /></span>
                 ) :
                 'Unable to trade, no such liquidity pair'
             }
@@ -820,6 +820,36 @@ const TradingForm: FC<ITradingFormProps> = ({busy, walletAssets, liquidityPairs,
       </Form>
     </Container>
   )
+}
+
+/**
+ * ========================================
+ * Components for printing a BigNumber nicely
+ * ========================================
+ */
+
+interface BigNumberDisplayProps {
+  value?: BigNumber;
+  decimals?: number;
+}
+
+const BigNumberDisplay: FC<BigNumberDisplayProps> = ({value, decimals}) => {
+
+  if (!value) {
+    return <span></span>;
+  }
+
+  const stringValue = ethers.utils.formatUnits(value, (decimals === undefined)? 18 : decimals);
+  const parts = stringValue.split('.');
+  if (parts.length > 1) {
+    if (parts[1].length > 5) {
+      return <span>{ parts[0] + '.' + parts[1].substring(0, 4) }</span>;
+    } else {
+      return <span>{ parts[0] + '.' + parts[1] }</span>;
+    }
+  } else {
+    return <span>{ stringValue }</span>;
+  }
 }
 
 export default App;
